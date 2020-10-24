@@ -9,53 +9,23 @@ import matplotlib.pyplot as plt
 import cupy as cp
 import numpy as np
 import sys
-from helper import is_int, max_pooling
+from helper import is_int
 import pandas as pd
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 from ANN import ANN
 from ADNN import DNN
+from keras.datasets import mnist
+from keras.utils import to_categorical
 def create_sets(dname='IRIS.csv',test_size=0.3):    
-    
-    if dname=='fashion.csv':
-        from keras.datasets import fashion_mnist as fmnist
-        from keras.utils import to_categorical
-        (train_images, train_labels), (test_images, test_labels) = fmnist.load_data()
-        
-        print(train_images.shape, test_images.shape)
-        train_images = train_images.reshape((train_images.shape[0], 28* 28))
-        # train_images = train_images.astype('float32') / 255
-        test_images = test_images.reshape((test_images.shape[0], 28 * 28))
-        # test_images = test_images.astype('float32') / 255
-        train_labels = to_categorical(train_labels)
-        test_labels = to_categorical(test_labels)
-
-        y_test = cp.array(test_labels.tolist())
-        y_train = cp.array(train_labels.tolist())
-        X_test = cp.array(test_images.tolist())
-        X_train = cp.array(train_images.tolist())
-
-        num_in = len(X_train[1])
-        num_out = len(y_train[1])
-
-        return num_in, num_out, X_train.T, X_test.T, y_train.T, y_test.T
-
-    
     if dname=='mnist.csv':
-        from keras.datasets import mnist
-        from keras.utils import to_categorical
+        
 
         (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
-        # print(train_images.shape,train_images[0].shape)
-
-        # train_images = max_pooling(train_images,kernel=(4,4))
-        # test_images = max_pooling(test_images,kernel=(4,4))
-        # print(train_images.shape,train_images[0].shape)
-        
-        train_images = train_images.reshape((60000, 28* 28))
-        # train_images = train_images.astype('float32') / 255
+        train_images = train_images.reshape((60000, 28 * 28))
+        train_images = train_images.astype('float32') / 255
         test_images = test_images.reshape((10000, 28 * 28))
-        # test_images = test_images.astype('float32') / 255
+        test_images = test_images.astype('float32') / 255
         train_labels = to_categorical(train_labels)
         test_labels = to_categorical(test_labels)
 
@@ -97,101 +67,43 @@ def create_sets(dname='IRIS.csv',test_size=0.3):
 
 
 
-dname = 'mnist.csv' #'IRIS.csv'
-hidden_layers=[15]
-activation_functions = ['sigmoid','softmax']
-learning_params = [20,0.01,128,0.0]
+DEBUG=1
+
+if DEBUG==0:
+    dname = sys.argv[1]
+    hidden_layers =  sys.argv[2].strip('[]').split(',')
+    hidden_layers = [int(h) for h in hidden_layers]
+    activation_functions = sys.argv[3].strip('[]').split(',')
+    learning_params =sys.argv[4].strip('[]').split(',')
+    learning_params = [int(l) if is_int(l) else float(l) for l in learning_params]
+else:
+    dname = 'mnist.csv' #'IRIS.csv'
+    hidden_layers=[30]
+    activation_functions = ['sigmoid','softmax']#,'softmax']
+    learning_params = [150,0.01,2,0.0]
 neurons_per_layer=hidden_layers
 
 num_in, num_out,X_train, X_test, y_train, y_test = create_sets(dname)
-print('Load Data: OK!')
-neurons_per_layer.append(num_out)
 
+neurons_per_layer.append(num_out)
 neurons_per_layer.insert(0,num_in)
 
-
-
-
-
-dnn = DNN(hidden_layers = neurons_per_layer,activations = activation_functions)
-print('Model Initialization: OK!')
-
+#net = ANN(neurons_per_layer,activation_functions, X_train,y_train)
+net = DNN(neurons_per_layer,activation_functions,initializer = 'random',rule='classic')
 validation_set=[X_test,y_test]
 
-
-print('=====Trainning=====')
-dnn_cost, dnn_acr, dnn_tacr=dnn.train(X=X_train,y=y_train,epochs=learning_params[0],validation_set=validation_set,batch_size=learning_params[2],lr=learning_params[1],lr_decay = learning_params[3] )
+learning_params[1] = -learning_params[1] if net.rule=='hebbian' else learning_params[1]
 
 
-hidden_layers=[150,15]
-neurons_per_layer=hidden_layers
-neurons_per_layer.append(num_out)
+print('Training starts')
+cost, acr=net.train(X=X_train, y=y_train, epochs=learning_params[0],validation_set=validation_set,batch_size=learning_params[2],lr=learning_params[1],lr_decay = learning_params[3] )
 
-neurons_per_layer.insert(0,num_in)
-
-activation_functions = ['sigmoid','sigmoid','softmax']
-
-
-ann =   ANN(neurons_per_layer,activation_functions)
-print('Model Initialization: OK!')
-
-validation_set=[X_test,y_test]
-
-
-print('=====Trainning=====')
-ann_cost, ann_acr, ann_tacr=ann.train(X=X_train,y=y_train,epochs=learning_params[0],validation_set=validation_set,batch_size=learning_params[2],lr=learning_params[1],lr_decay = learning_params[3] )
-
-
-
-
-
-hidden_layers=[15]
-neurons_per_layer=hidden_layers
-neurons_per_layer.append(num_out)
-
-neurons_per_layer.insert(0,num_in)
-
-activation_functions = ['sigmoid','softmax']
-
-
-
-slp = ANN(neurons_per_layer,activation_functions)
-print('Model Initialization: OK!')
-
-validation_set=[X_test,y_test]
-
-
-print('=====Trainning=====')
-slp_cost, slp_acr, slp_tacr=slp.train(X=X_train,y=y_train,epochs=learning_params[0],validation_set=validation_set,batch_size=learning_params[2],lr=learning_params[1],lr_decay = learning_params[3] )
-
-
-
-plt.figure(1)
 plt.title('Loss Function')
-ann_plt, =plt.plot(list(range(len(ann_cost))),ann_cost)
-dnn_plt, =plt.plot(list(range(len(dnn_cost))),dnn_cost)
-slp_plt, = plt.plot(list(range(len(slp_cost))),slp_cost)
-plt.legend([ann_plt,dnn_plt,slp_plt], ['DNN', 'ANN', '1-Layer Perceptron'])
+plt.plot(list(range(len(cost))),cost)
 plt.show()
-# plt.savefig('./images/MNIST/cost.py')
 
-
-plt.figure(1)
-plt.title('Accuracy on Train')
-ann_plt, =plt.plot(list(range(len(ann_tacr))),ann_tacr)
-dnn_plt, =plt.plot(list(range(len(dnn_tacr))),dnn_tacr)
-slp_plt, = plt.plot(list(range(len(slp_tacr))),slp_tacr)
-plt.legend([ann_plt,dnn_plt,slp_plt], ['DNN', 'ANN', '1-Layer Perceptron'])
-plt.show()
-# plt.savefig('./images/MNIST/train_acc.py')
-
-
-plt.figure(2)
-if validation_set!=None:
-    plt.title('Accuracy on Test')
-    ann_plt, = plt.plot(list(range(len(ann_acr))),ann_acr)
-    dnn_plt, = plt.plot(list(range(len(dnn_acr))),dnn_acr)
-    slp_plt, = plt.plot(list(range(len(slp_acr))),slp_acr)
-    plt.legend([ann_plt,dnn_plt,slp_plt], ['DNN', 'ANN', '1-Layer Perceptron'])
+if acr!=None:
+    plt.title('Accuracy')
+    plt.plot(list(range(len(acr))),acr)
     plt.show()
-    # plt.savefig('./images/MNIST/test_acc.py')
+

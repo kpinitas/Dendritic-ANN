@@ -10,10 +10,11 @@ from activations import activation,sigmoid_der
 import cupy as cp
 from losses import  loss as loss_func
 class ANN:
-    def __init__(self,neurons_per_layer=[],activation_functions=[], X_train=None,y_train=None, lr=0.01):
+    def __init__(self,neurons_per_layer,activation_functions, X_train=None,y_train=None, lr=0.01,initializer='random'):
 
         self.neurons_per_layer=neurons_per_layer
         self.lr = lr
+        self.initializer=initializer
         self.activation_functions = activation_functions
         self.weights={}
         self.biases={}
@@ -24,15 +25,23 @@ class ANN:
         self.dB={};
         self.X_train = X_train
         self.y_train=y_train
-        self.init_params()
+        self.init_params(self.initializer)
         
         
-    def init_params(self):
+    def init_params(self, initializer):
         for i in range(len(self.neurons_per_layer[1:])):
-           self.weights[i] = cp.random.normal(size=(self.neurons_per_layer[i+1],self.neurons_per_layer[i]))
-           # self.weights[i] = self.weights[i]/cp.sqrt(cp.sum(self.weights[i]))
-           self.biases[i]=cp.random.random((self.neurons_per_layer[i+1],1))
-     
+          
+          if initializer == 'random':  
+               self.weights[i] = cp.random.normal(size=(self.neurons_per_layer[i+1],self.neurons_per_layer[i]))
+               # self.weights[i] = self.weights[i]/cp.sqrt(cp.sum(self.weights[i]))
+               self.biases[i]=cp.random.random((self.neurons_per_layer[i+1],1))
+          
+          elif initializer == 'zero':
+                
+               self.weights[i] = cp.zeros(shape=(self.neurons_per_layer[i+1],self.neurons_per_layer[i]))
+               # self.weights[i] = self.weights[i]/cp.sqrt(cp.sum(self.weights[i]))
+               self.biases[i]=cp.zeros(shape=(self.neurons_per_layer[i+1],1))
+           
      
     def forward_propagation(self,X):
         try:
@@ -102,7 +111,6 @@ class ANN:
             X=self.X_train
             y=self.y_train
             lr = self.lr
-        acr_train=[]
         cost=[]
         acr = []
         for i in range(epochs):
@@ -130,17 +138,13 @@ class ANN:
             print('=== Epoch: '+str(i+1)+' ===')
             print('cost: ',epoch_loss)
             cost.append(epoch_loss.tolist())
-            tr_pred= self.predict(X)
-            a=accuracy(tr_pred,y)
-            lr = (1-a)/4
-            acr_train.append(a)
             if validation_set!=None:
                 val_pred = self.predict(validation_set[0])
                 a=accuracy(val_pred,validation_set[1])
                 acr.append(a)
             else:
                 acr=None
-        return cost, acr,acr_train
+        return cost, acr
 
     def predict(self, X=None):
         self.forward_propagation(X)
